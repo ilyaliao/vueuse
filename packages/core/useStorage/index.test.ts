@@ -1,6 +1,6 @@
 import { debounceFilter } from '@vueuse/shared'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { defineComponent, nextTick, ref, toRaw } from 'vue'
+import { computed, defineComponent, nextTick, ref, toRaw } from 'vue'
 import { customStorageEventName, StorageSerializers, useStorage } from '.'
 import { mount, nextTwoTick, useSetup } from '../../.test'
 
@@ -546,5 +546,44 @@ describe('useStorage', () => {
     state1.value = 1
     await nextTick()
     expect(state2.value).toBe(1)
+  })
+
+  it('should update storage reference when key is ref', async () => {
+    const key = ref('ref-key-1')
+    const state = useStorage(key, 'default', storage)
+    expect(state.value).toBe('default')
+
+    storage.setItem('ref-key-2', 'value-2')
+    key.value = 'ref-key-2'
+    await nextTick()
+    expect(state.value).toBe('value-2')
+
+    state.value = 'new-value'
+    await nextTick()
+    expect(storage.getItem('ref-key-2')).toBe('new-value')
+
+    key.value = 'ref-key-1'
+    await nextTick()
+    expect(state.value).toBe('default')
+  })
+
+  it('should update storage reference when key is computed', async () => {
+    const dynamicKey = ref('key-1')
+    const key = computed(() => `computed-${dynamicKey.value}`)
+    const state = useStorage(key, 'default', storage)
+    expect(state.value).toBe('default')
+
+    storage.setItem('computed-key-2', 'value-2')
+    dynamicKey.value = 'key-2'
+    await nextTick()
+    expect(state.value).toBe('value-2')
+
+    state.value = 'new-value'
+    await nextTick()
+    expect(storage.getItem('computed-key-2')).toBe('new-value')
+
+    dynamicKey.value = 'key-1'
+    await nextTick()
+    expect(state.value).toBe('default')
   })
 })
