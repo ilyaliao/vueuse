@@ -48,9 +48,7 @@ export interface UntilBaseInstance<T, Not extends boolean = false> {
 
 type Falsy = false | void | null | undefined | 0 | 0n | ''
 
-export interface UntilValueInstance<T, Not extends boolean = false> extends UntilBaseInstance<T, Not> {
-  readonly not: UntilValueInstance<T, Not extends true ? false : true>
-
+export interface UntilBaseValueInstance<T, Not extends boolean = false> extends UntilBaseInstance<T, Not> {
   toBe: <P = T>(value: MaybeRefOrGetter<P>, options?: UntilToMatchOptions) => Not extends true ? Promise<T> : Promise<P>
   toBeTruthy: (options?: UntilToMatchOptions) => Not extends true ? Promise<T & Falsy> : Promise<Exclude<T, Falsy>>
   toBeNull: (options?: UntilToMatchOptions) => Not extends true ? Promise<Exclude<T, null>> : Promise<null>
@@ -58,13 +56,23 @@ export interface UntilValueInstance<T, Not extends boolean = false> extends Unti
   toBeNaN: (options?: UntilToMatchOptions) => Promise<T>
 }
 
-export interface UntilArrayInstance<T> extends UntilBaseInstance<T> {
-  readonly not: UntilArrayInstance<T>
+export interface UntilValueInstanceWithNot<T, Not extends boolean = false> extends UntilBaseValueInstance<T, Not> {
+  readonly not: UntilBaseValueInstance<T, Not extends true ? false : true>
+}
 
+export type UntilValueInstance<T, WithNot extends boolean = true> = WithNot extends true ? UntilValueInstanceWithNot<T> : UntilBaseValueInstance<T>
+
+export interface UntilBaseArrayInstance<T> extends UntilBaseInstance<T> {
   toContains: (value: MaybeRefOrGetter<ElementOf<ShallowUnwrapRef<T>>>, options?: UntilToMatchOptions) => Promise<T>
 }
 
-function createUntil<T>(r: any, isNot = false) {
+export interface UntilArrayInstanceWithNot<T> extends UntilBaseArrayInstance<T> {
+  readonly not: UntilBaseArrayInstance<T>
+}
+
+export type UntilArrayInstance<T, WithNot extends boolean = true> = WithNot extends true ? UntilArrayInstanceWithNot<T> : UntilBaseArrayInstance<T>
+
+function createUntil<T>(r: any, isNot = false, notWithNot = false) {
   function toMatch(
     condition: (v: any) => boolean,
     { flush = 'sync', deep = false, timeout, throwOnTimeout }: UntilToMatchOptions = {},
@@ -182,19 +190,28 @@ function createUntil<T>(r: any, isNot = false) {
   }
 
   if (Array.isArray(toValue(r))) {
-    const instance: UntilArrayInstance<T> = {
+    const baseInstance: UntilBaseArrayInstance<T> = {
       toMatch: toMatch as any,
       toContains,
       changed,
       changedTimes,
-      get not() {
-        return createUntil(r, !isNot) as UntilArrayInstance<T>
-      },
     }
-    return instance
+
+    if (notWithNot) {
+      return baseInstance
+    }
+    else {
+      const instanceWithNot: UntilArrayInstanceWithNot<T> = {
+        ...baseInstance,
+        get not() {
+          return createUntil(r, !isNot, true) as UntilBaseArrayInstance<T>
+        },
+      }
+      return instanceWithNot
+    }
   }
   else {
-    const instance: UntilValueInstance<T, boolean> = {
+    const baseInstance: UntilBaseValueInstance<T, boolean> = {
       toMatch: toMatch as any,
       toBe,
       toBeTruthy: toBeTruthy as any,
@@ -203,12 +220,21 @@ function createUntil<T>(r: any, isNot = false) {
       toBeUndefined: toBeUndefined as any,
       changed,
       changedTimes,
-      get not() {
-        return createUntil(r, !isNot) as UntilValueInstance<T, boolean>
-      },
     }
 
-    return instance
+    if (notWithNot) {
+      return baseInstance
+    }
+    else {
+      const instanceWithNot: UntilValueInstanceWithNot<T, boolean> = {
+        ...baseInstance,
+        get not() {
+          return createUntil(r, !isNot, true) as UntilBaseValueInstance<T, boolean>
+        },
+      }
+
+      return instanceWithNot
+    }
   }
 }
 
@@ -225,8 +251,8 @@ function createUntil<T>(r: any, isNot = false) {
  * alert('Counter is now larger than 7!')
  * ```
  */
-export function until<T extends unknown[]>(r: WatchSource<T> | MaybeRefOrGetter<T>): UntilArrayInstance<T>
-export function until<T>(r: WatchSource<T> | MaybeRefOrGetter<T>): UntilValueInstance<T>
-export function until<T>(r: any): UntilValueInstance<T> | UntilArrayInstance<T> {
-  return createUntil(r)
+export function until<T extends unknown[]>(r: WatchSource<T> | MaybeRefOrGetter<T>): UntilArrayInstanceWithNot<T>
+export function until<T>(r: WatchSource<T> | MaybeRefOrGetter<T>): UntilValueInstanceWithNot<T>
+export function until<T>(r: any): UntilValueInstanceWithNot<T> | UntilArrayInstanceWithNot<T> {
+  return createUntil(r) as UntilValueInstanceWithNot<T> | UntilArrayInstanceWithNot<T>
 }
