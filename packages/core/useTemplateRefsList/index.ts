@@ -5,6 +5,9 @@ export type TemplateRefsList<T> = T[] & {
   set: (el: object | null) => void
 }
 
+/**
+ * @deprecated This function will be removed in future version. Use Vue's built-in `useTemplateRef` instead.
+ */
 export function useTemplateRefsList<T = Element>(): Readonly<Ref<Readonly<TemplateRefsList<T>>>> {
   const refs = deepRef<unknown>([]) as Ref<TemplateRefsList<T>>
   refs.value.set = (el: object | null) => {
